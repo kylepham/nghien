@@ -13,8 +13,8 @@ const Home: NextPage = () => {
   }, []);
 
   const socketInitializer = useCallback(async () => {
-    await fetch("/api/socket");
-    socket = io();
+    await fetch("http://150.136.63.106:6969");
+    socket = io("http://150.136.63.106:6969/");
 
     // socket.emit("new-user");
 
@@ -26,9 +26,6 @@ const Home: NextPage = () => {
       setUsers(users);
     });
 
-    // socket.on("handle-click", (str) => {
-    //   console.log(str);
-    // });
     socket.on("user-leave", (user) => {
       setUsers((prevUsers) => prevUsers.filter((userId) => userId !== user));
     });
