@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { Server } from "Socket.IO";
-import { Socket } from "socket.io/dist/socket";
+import { Server } from "socket.io";
 
 const SocketHandler = (req, res) => {
   if (res.socket.server.io) {
