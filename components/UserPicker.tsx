@@ -1,0 +1,48 @@
+import { useCallback, useEffect, useState } from "react";
+import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { db } from "../firebaseConfig";
+
+const UserPicker = ({ setWho }) => {
+  const [existingUsers, setExistingUsers] = useState<Array<String>>([]);
+
+  useEffect(() => {
+    getUsers();
+  }, []);
+
+  const getUsers = useCallback(async () => {
+    onSnapshot(collection(db, "/users"), (docs) => {
+      const usersList = [];
+      docs.forEach((doc) => usersList.push(doc.id));
+      setExistingUsers(usersList);
+    });
+  }, []);
+
+  const onUserClick = useCallback(async () => {}, []);
+
+  return (
+    <div className="flex flex-col w-80 items-center border border-black p-8 m-8 rounded">
+      <p className="font-bold text-2xl">UserPicker</p>
+      <div className="flex flex-wrap justify-center">
+        {existingUsers.length > 0 ? (
+          existingUsers.map((user, index) => {
+            return (
+              <button
+                className="bg-green-200 rounded p-2 m-2 text-gray-700 hover:bg-green-300"
+                key={index}
+                onClick={() => {
+                  setWho(user);
+                }}
+              >
+                {user}
+              </button>
+            );
+          })
+        ) : (
+          <p className="text-gray-400">No registered users in DB :(</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default UserPicker;
