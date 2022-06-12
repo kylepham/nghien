@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
-const UserPicker = ({ setWho }) => {
+interface UserPickerProps {
+  setWho: Dispatch<SetStateAction<String | null>>;
+}
+const UserPicker = ({ setWho }: UserPickerProps) => {
   const [existingUsers, setExistingUsers] = useState<Array<String>>([]);
 
   useEffect(() => {
@@ -11,17 +14,15 @@ const UserPicker = ({ setWho }) => {
 
   const getUsers = useCallback(async () => {
     onSnapshot(collection(db, "/users"), (docs) => {
-      const usersList = [];
+      const usersList: string[] = [];
       docs.forEach((doc) => usersList.push(doc.id));
       setExistingUsers(usersList);
     });
   }, []);
 
-  const onUserClick = useCallback(async () => {}, []);
-
   return (
     <div className="flex flex-col w-80 items-center border border-black p-8 m-8 rounded">
-      <p className="font-bold text-2xl">UserPicker</p>
+      <p className="font-bold text-2xl">Mày là thằng nào?</p>
       <div className="flex flex-wrap justify-center">
         {existingUsers.length > 0 ? (
           existingUsers.map((user, index) => {
