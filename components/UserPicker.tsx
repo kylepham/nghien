@@ -13,11 +13,15 @@ const UserPicker = ({ setWho }: UserPickerProps) => {
   }, []);
 
   const getUsers = useCallback(async () => {
-    onSnapshot(collection(db, "/users"), (docs) => {
+    const unsubscribe = onSnapshot(collection(db, "/users"), (docs) => {
       const usersList: string[] = [];
       docs.forEach((doc) => usersList.push(doc.id));
       setExistingUsers(usersList);
     });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   return (

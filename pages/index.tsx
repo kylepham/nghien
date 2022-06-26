@@ -16,9 +16,7 @@ const Home: NextPage = () => {
       </Head>
 
       {who ? (
-        <React.StrictMode>
-          <Game who={who} />
-        </React.StrictMode>
+        <Game who={who} />
       ) : (
         <>
           <UserPicker setWho={setWho} />

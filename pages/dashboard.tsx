@@ -1,12 +1,13 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
 import { doc, increment, updateDoc } from "firebase/firestore";
 import io from "socket.io-client";
+import { AiOutlineClear } from "react-icons/ai";
 import { db } from "../firebaseConfig";
 import { Loser, User } from "../types";
 
-let socket = io();
+let socket = io("https://arcane-chamber-60613.herokuapp.com/");
 
 const DASHBOARD_STATES = {
   pausing: "pausing",
@@ -23,10 +24,12 @@ interface UsersListProps {
 }
 
 interface GameLogProps {
-  countLosers: number;
-  countOnlineUsers: number;
+  losers: Loser[];
+  numberOfPlayers: number;
   getFucked: string[];
   winner: string;
+  setWinner: Dispatch<SetStateAction<string>>;
+  setLosers: Dispatch<SetStateAction<Loser[]>>;
 }
 
 const UsersList = ({ lossChanges, title, users }: UsersListProps) => {
@@ -55,10 +58,18 @@ const UsersList = ({ lossChanges, title, users }: UsersListProps) => {
   );
 };
 
-const GameLog = ({ countLosers, countOnlineUsers, getFucked, winner }: GameLogProps) => {
+const GameLog = ({ losers, numberOfPlayers, getFucked, winner, setWinner, setLosers }: GameLogProps) => {
   return (
     <div className="bg-cyan-200 w-full rounded-md p-4 space-y-4 select-none">
-      <h1 className="underline">Log</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex space-x-4">
+          <h1 className="underline">Log</h1>
+          <button>
+            <AiOutlineClear size={40} color="#EF5656" />
+          </button>
+        </div>
+        <h3 className="bg-green-400 p-2 rounded-md">{numberOfPlayers}</h3>
+      </div>
       {!!winner && <h2 className="text-red-300">Winner: {winner}</h2>}
       {getFucked.map((user, index) =>
         index % 2 === 0 ? (
@@ -70,9 +81,18 @@ const GameLog = ({ countLosers, countOnlineUsers, getFucked, winner }: GameLogPr
         ) : null
       )}
       {!!winner && (
-        <h3>
-          {countLosers} / {countOnlineUsers - 1}
-        </h3>
+        <div>
+          <h3>
+            {losers.length} / {numberOfPlayers - 1}
+          </h3>
+          {losers.map((loser, index) => {
+            return (
+              <h3 key={index}>
+                {loser.name}: {loser.loss}
+              </h3>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -84,17 +104,30 @@ const Dashboard = () => {
   const [offlineUsers, setOfflineUsers] = useState<User[]>([]);
   const [id, setId] = useState([]);
   const [dashboardState, setDashboardState] = useState(DASHBOARD_STATES.pausing);
+  const [numberOfPlayers, setNumberOfPlayers] = useState(0);
   const [winner, setWinner] = useState("");
   const [losers, setLosers] = useState<Loser[]>([]);
   const [lossChanges, setLossChanges] = useState({});
   const [getFucked, setGetFucked] = useState<string[]>([]);
 
   useEffect(() => {
+    // (async () => {
+    //   await fetch("http://localhost:6969");
+    // })();
+    socket = io("https://arcane-chamber-60613.herokuapp.com/", {
+      transports: ["websocket"],
+      upgrade: false,
+    });
     socketInitializer();
+
+    return () => {
+      socket.emit("delete-allsockets");
+      socket.close();
+    };
   }, []);
 
   useEffect(() => {
-    if (losers.length === onlineUsers.length - 1 && onlineUsers.length !== 1) {
+    if (losers.length === numberOfPlayers - 1 && numberOfPlayers !== 1) {
       const userScores: { [key: string]: number } = {};
       let sumLosers = losers.reduce((prev, current) => prev + current.loss, 0);
       userScores[winner] = sumLosers;
@@ -124,7 +157,11 @@ const Dashboard = () => {
       setDashboardState(DASHBOARD_STATES.playing);
       socket.emit("dashboard-newgame");
     }
-  }, [losers]);
+  }, [losers, numberOfPlayers, winner, getFucked]);
+
+  useEffect(() => {
+    if (dashboardState === DASHBOARD_STATES.pausing) setNumberOfPlayers(onlineUsers.length);
+  }, [dashboardState, onlineUsers]);
 
   useEffect(() => {
     if (onlineUsers.length <= 1) {
@@ -137,9 +174,6 @@ const Dashboard = () => {
   }, [onlineUsers]);
 
   const socketInitializer = useCallback(async () => {
-    await fetch("https://arcane-chamber-60613.herokuapp.com");
-    socket = io("https://arcane-chamber-60613.herokuapp.com");
-
     socket.on("connect", () => {
       console.log("connected");
       socket.emit("dashboard-self");
@@ -180,21 +214,12 @@ const Dashboard = () => {
     });
 
     socket.on("who-i-am", (name, socketId) => {
-      // setDashboardState((prevDashboardState) => {
       setOnlineUsers((prevOnlineUsers) => {
-        // if (prevDashboardState !== "joining") {
-        //   socket.emit("kick", socketId);
-        //   return prevOnlineUsers;
-        // }
-
         const indexOnline = prevOnlineUsers.findIndex((user) => user.name === name);
         if (indexOnline !== -1) {
           if (prevOnlineUsers[indexOnline].socketId === socketId) return prevOnlineUsers;
 
           console.log(name, indexOnline);
-          // prevOnlineUsers[indexOnline].socketId = socketId;
-          // return prevOnlineUsers;
-          // console.log("kick", socketId);
           socket.emit("kick", prevOnlineUsers[indexOnline].socketId);
           const prevOnlineUsersClone = JSON.parse(JSON.stringify(prevOnlineUsers));
           prevOnlineUsersClone[indexOnline].socketId = socketId;
@@ -248,7 +273,6 @@ const Dashboard = () => {
     });
 
     socket.on("user-leave", (socketId) => {
-      console.log(socketId);
       setOnlineUsers((prevOnlineUsers) => {
         const leftUser = prevOnlineUsers.filter((user) => user.socketId === socketId)[0];
         if (!leftUser) return prevOnlineUsers;
@@ -278,7 +302,7 @@ const Dashboard = () => {
 
       <div className="flex space-x-4">
         <button
-          className={"p-1 rounded-sm hover:bg-gray-400 transition-colors duration-300"}
+          className="p-1 rounded-sm hover:bg-gray-400 transition-colors duration-300"
           onClick={() => {
             socket.emit("delete-allsockets");
           }}
@@ -307,6 +331,14 @@ const Dashboard = () => {
         >
           PLAY
         </button>
+        <button
+          className="p-1 rounded-sm hover:bg-gray-400 transition-colors duration-300"
+          onClick={() => {
+            socket.connect();
+          }}
+        >
+          RECONNECT
+        </button>
       </div>
 
       <div className="flex flex-col w-full space-y-4 md:flex-row md:space-x-4 md:space-y-0">
@@ -325,8 +357,10 @@ const Dashboard = () => {
         <GameLog
           winner={winner}
           getFucked={getFucked}
-          countLosers={losers.length}
-          countOnlineUsers={onlineUsers.length}
+          losers={losers}
+          numberOfPlayers={numberOfPlayers}
+          setWinner={setWinner}
+          setLosers={setLosers}
         />
       </div>
     </div>

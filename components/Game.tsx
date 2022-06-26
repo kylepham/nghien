@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import io from "socket.io-client";
 
-let socket = io();
+let socket = io("https://arcane-chamber-60613.herokuapp.com/");
 
 enum GameStates {
   NEW_GAME,
@@ -17,6 +17,7 @@ interface GameProps {
 }
 
 const Game = ({ who }: GameProps) => {
+  console.log(who);
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(false);
   const [gameState, setGameState] = useState(GameStates.NEW_GAME);
@@ -26,13 +27,21 @@ const Game = ({ who }: GameProps) => {
 
   useEffect(() => {
     if (who === null) return;
+    // (async () => {
+    //   await fetch("http://localhost:6969");
+    // })();
+    socket = io("https://arcane-chamber-60613.herokuapp.com/", {
+      transports: ["websocket"],
+      upgrade: false,
+    });
     socketInitializer();
+
+    return () => {
+      socket.close();
+    };
   }, [who]);
 
   const socketInitializer = useCallback(async () => {
-    await fetch("https://arcane-chamber-60613.herokuapp.com");
-    socket = io("https://arcane-chamber-60613.herokuapp.com");
-
     socket.on("connect", () => {
       console.log("connected");
       socket.emit("my-socketid");
@@ -75,7 +84,7 @@ const Game = ({ who }: GameProps) => {
     });
 
     socket.on("dismiss", () => {
-      setJustTookAction(false);
+      // setJustTookAction(false);
       setGameState(GameStates.NEW_GAME);
     });
 
