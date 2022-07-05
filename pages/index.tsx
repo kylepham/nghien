@@ -1,22 +1,25 @@
 import type { NextPage } from "next";
-import React, { useState } from "react";
 import Head from "next/head";
+import React, { useState } from "react";
 import UserPicker from "../components/UserPicker";
 import UserRegister from "../components/UserRegister";
 import Game from "../components/Game";
+import { SocketProvider } from "../contexts/socket";
 
 const Home: NextPage = () => {
-  const [who, setWho] = useState<String | null>(null);
+  const [who, setWho] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col items-center h-screen">
+    <div className="flex h-screen flex-col items-center">
       <Head>
-        <title>Sam Loc - Login</title>
+        <title>Login - Sam Loc</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       {who ? (
-        <Game who={who} />
+        <SocketProvider>
+          <Game who={who} />
+        </SocketProvider>
       ) : (
         <>
           <UserPicker setWho={setWho} />
