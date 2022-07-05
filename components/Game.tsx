@@ -1,190 +1,211 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
-import io from "socket.io-client";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
+import { useSocket } from "../contexts/socket";
 
-let socket = io("https://arcane-chamber-60613.herokuapp.com/");
-
-enum GameStates {
-  NEW_GAME,
-  WAITING,
-  LOSER,
-  GET_FUCKED,
-}
+const GAME_STATES = {
+  winning: "winning",
+  losing: "losing",
+  pausing: "pausing",
+  playing: "playing",
+};
 
 interface GameProps {
-  who: String;
+  who: string;
 }
 
 const Game = ({ who }: GameProps) => {
-  console.log(who);
   const router = useRouter();
-  const [isOnline, setIsOnline] = useState(false);
-  const [gameState, setGameState] = useState(GameStates.NEW_GAME);
-  const [justTookAction, setJustTookAction] = useState(false);
-  const [dashboardState, setDashboardState] = useState("");
-  const [loss, setLoss] = useState("");
+  const { socket } = useSocket();
+
+  const [isDashboardOnline, setIsDashboardOnline] = useState<boolean>(false);
+  const [gameState, setGameState] = useState<string>(GAME_STATES.pausing);
+  const [loss, setLoss] = useState<string>("");
+  const [isLossSubmitted, setIsLossSubmitted] = useState<boolean>(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [isOnlineUsersVisible, setIsOnlineUsersVisible] = useState<boolean>(false);
 
   useEffect(() => {
-    if (who === null) return;
-    // (async () => {
-    //   await fetch("http://localhost:6969");
-    // })();
-    socket = io("https://arcane-chamber-60613.herokuapp.com/", {
-      transports: ["websocket"],
-      upgrade: false,
+    socket?.on("connect", () => {
+      console.log("my socket id", socket?.id);
+      socket.emit("new-user", who);
+      socket.emit("status");
     });
-    socketInitializer();
-
-    return () => {
-      socket.close();
-    };
   }, [who]);
 
-  const socketInitializer = useCallback(async () => {
-    socket.on("connect", () => {
-      console.log("connected");
-      socket.emit("my-socketid");
-      socket.emit("status", who);
-    });
-
-    socket.on("online", (from, isLossRegistered, winner, fucker, dashboardState) => {
-      if (who !== from && from !== "") return;
-      setIsOnline(true);
-      setDashboardState(dashboardState);
+  useEffect(() => {
+    socket?.on("status", (isDashboardOnline, gameState, winner) => {
+      setIsDashboardOnline(isDashboardOnline);
+      setGameState(gameState);
 
       if (winner !== "") {
-        if (who !== winner && !isLossRegistered) setGameState(GameStates.LOSER);
-        else {
-          setGameState(GameStates.WAITING);
-          if (who === winner) setJustTookAction(true);
-        }
-      } else if (fucker !== "") {
-        if (who !== fucker) setGameState(GameStates.GET_FUCKED);
-        else {
-          setGameState(GameStates.WAITING);
-          setJustTookAction(true);
+        if (winner !== who) {
+          setGameState(GAME_STATES.losing);
+        } else {
+          setGameState(GAME_STATES.winning);
         }
       }
-
-      socket.emit("who-i-am", who);
     });
 
-    socket.on("dashboard-statechange", (dashboardState) => {
-      setDashboardState(dashboardState);
-      setGameState(GameStates.NEW_GAME);
-    });
-
-    socket.on("lose", (winnerName) => {
-      if (winnerName !== who) setGameState(GameStates.LOSER);
-    });
-
-    socket.on("prompt-fucked", (from) => {
-      if (from !== who) setGameState(GameStates.GET_FUCKED);
-    });
-
-    socket.on("dismiss", () => {
-      // setJustTookAction(false);
-      setGameState(GameStates.NEW_GAME);
-    });
-
-    socket.on("new-game", () => {
-      setJustTookAction(false);
-      setGameState(GameStates.NEW_GAME);
-    });
-
-    socket.on("kick", () => {
-      router.replace("/").then(() => router.reload());
-    });
+    return () => {
+      socket?.off("status");
+    };
   }, []);
+
+  useEffect(() => {
+    socket?.on("update-users", (onlineUsers) => {
+      setOnlineUsers(onlineUsers);
+    });
+
+    return () => {
+      socket?.off("update-users");
+    };
+  }, []);
+
+  useEffect(() => {
+    socket?.on("pause", () => {
+      setGameState(GAME_STATES.pausing);
+    });
+
+    socket?.on("play", () => {
+      setGameState(GAME_STATES.playing);
+    });
+
+    return () => {
+      socket?.off("pause");
+      socket?.off("play");
+    };
+  }, []);
+
+  useEffect(() => {
+    socket?.on("lose", () => {
+      setGameState(GAME_STATES.losing);
+      setIsLossSubmitted(false);
+    });
+
+    return () => {
+      socket?.off("lose");
+    };
+  }, []);
+
+  useEffect(() => {
+    socket?.on("cancel", () => {
+      setGameState(GAME_STATES.playing);
+      setLoss("");
+    });
+
+    return () => {
+      socket?.off("cancel");
+    };
+  }, []);
+
+  useEffect(() => {
+    socket?.on("kick", () => {
+      router.reload();
+    });
+
+    return () => {
+      socket?.off("kick");
+    };
+  }, []);
+
+  const handleWin = useCallback(() => {
+    setGameState(GAME_STATES.winning);
+    socket?.emit("win", who);
+  }, [who]);
+
+  const handleCancel = useCallback(() => {
+    socket?.emit("cancel");
+  }, []);
+
+  const handleLossChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setLoss(e.target.value);
+  }, []);
+
+  const handleSubmitLoss = useCallback(() => {
+    if (!!!Number.parseInt(loss) || Number.parseInt(loss) === 0) return;
+
+    setLoss("");
+    setIsLossSubmitted(true);
+    socket?.emit("loss-submit", who, Number.parseInt(loss));
+  }, [loss]);
+
+  const handleShowOnlineUsers = useCallback(() => {
+    setIsOnlineUsersVisible(!isOnlineUsersVisible);
+  }, [isOnlineUsersVisible]);
+
+  const handleReportFuck = useCallback((fucker: string, fucked: string) => {
+    setIsOnlineUsersVisible(false);
+    socket?.emit("report-fuck", fucker, fucked);
+  }, []);
+
   return (
-    <>
+    <div className="flex h-full w-full flex-col">
       <Head>
-        <title>Sam Loc - {who}</title>
+        <title>{who} - Sam Loc</title>
       </Head>
 
-      <h3 className="mt-4">- {who} -</h3>
-      <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg h-sc">
-        {isOnline ? (
-          dashboardState === "pausing" ? (
-            <p className="text-gray-700">Game paused</p>
-          ) : gameState === GameStates.NEW_GAME ? (
+      <h2 className="m-auto mt-2">- {who} -</h2>
+
+      <div className="m-auto flex flex-grow flex-col items-center justify-center">
+        {isDashboardOnline ? (
+          gameState === GAME_STATES.pausing ? (
+            <p>Game Paused</p>
+          ) : gameState === GAME_STATES.playing ? (
             <>
-              <button
-                className="bg-red-400 p-2 m-2 rounded text-7xl font-bold"
-                onClick={() => {
-                  socket.emit("dashboard-win", who);
-                  setJustTookAction(true);
-                  setGameState(GameStates.WAITING);
-                }}
-              >
-                Win
-              </button>
-              <button
-                className="bg-black p-2 m-2 rounded text-7xl text-white font-bold"
-                onClick={() => {
-                  socket.emit("dashboard-fucks", who);
-                  socket.emit("prompt-fucked", who);
-                  setJustTookAction(true);
-                  setGameState(GameStates.WAITING);
-                }}
-              >
-                GET F*CKED
+              <button onClick={handleWin} className="bg-red-400 text-8xl font-bold">
+                Win 🎉
               </button>
             </>
-          ) : gameState === GameStates.WAITING ? (
+          ) : gameState === GAME_STATES.winning ? (
             <>
-              <p className="text-gray-700">Waiting...</p>
-              {justTookAction && (
-                <button
-                  className="bg-green-200 rounded p-2 m-2 text-gray-700 hover:bg-green-300"
-                  onClick={() => {
-                    socket.emit("dismiss");
-                  }}
-                >
-                  Back
-                </button>
-              )}
+              <h3>You win </h3>
+              <button onClick={handleCancel}>Cancel</button>
             </>
-          ) : gameState === GameStates.LOSER ? (
-            <div className="flex flex-col self-center items-center">
-              <p className="text-gray-700">Alo alo. Thua bao nhiêu cơ?</p>
-              <input
-                className="border border-black rounded p-2 text-lg text-center"
-                value={loss}
-                type="tel"
-                onChange={(e) => {
-                  setLoss(e.target.value);
-                }}
-              />
-              <button
-                className="bg-green-200 rounded p-2 m-2 text-gray-700 text-5xl hover:bg-green-300"
-                onClick={() => {
-                  if (!!!Number.parseInt(loss)) return;
-                  socket.emit("dashboard-lose", who, Number.parseInt(loss));
-                  setLoss("");
-                  setGameState(GameStates.WAITING);
-                }}
-              >
-                🌶
-              </button>
-            </div>
+          ) : gameState === GAME_STATES.losing ? (
+            isLossSubmitted ? (
+              <p>Waiting...</p>
+            ) : (
+              <>
+                <h3>You lose</h3>
+                <input type="tel" value={loss} onChange={handleLossChange} />
+                <button onClick={handleSubmitLoss}>Cay</button>
+              </>
+            )
           ) : (
-            <button
-              className="bg-black p-2 m-2 rounded text-7xl text-white font-bold"
-              onClick={() => {
-                socket.emit("dashboard-fucks", who);
-                socket.emit("dashboard-newgame");
-              }}
-            >
-              I&apos;M F*CKED
-            </button>
+            <p>something went wrong</p>
           )
         ) : (
-          <p className="text-gray-700">Chưa có game, đợi đê 🥱</p>
+          <p>Game offline</p>
         )}
       </div>
-    </>
+
+      {gameState === GAME_STATES.playing && (
+        <>
+          <button onClick={handleShowOnlineUsers} className="mx-4 mb-0 rounded-b-none bg-green-400 text-lg font-bold">
+            Chặt 🐷 zone
+          </button>
+
+          <div className="mx-4 bg-green-200">
+            {isOnlineUsersVisible && (
+              <>
+                {onlineUsers.filter((user) => user !== who).length === 0 ? (
+                  <p className="p-2 text-gray-700">No other users</p>
+                ) : (
+                  onlineUsers
+                    .filter((user) => user !== who)
+                    .map((user) => (
+                      <button key={user} onClick={() => handleReportFuck(who, user)} className="bg-yellow-200">
+                        {user}
+                      </button>
+                    ))
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 };
 

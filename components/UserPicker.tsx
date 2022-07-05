@@ -3,10 +3,10 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 interface UserPickerProps {
-  setWho: Dispatch<SetStateAction<String | null>>;
+  setWho: Dispatch<SetStateAction<string | null>>;
 }
 const UserPicker = ({ setWho }: UserPickerProps) => {
-  const [existingUsers, setExistingUsers] = useState<Array<String>>([]);
+  const [existingUsers, setExistingUsers] = useState<Array<string>>([]);
 
   useEffect(() => {
     getUsers();
