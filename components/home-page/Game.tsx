@@ -1,7 +1,9 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { ChangeEvent, useCallback, useEffect, useState } from "react";
-import { useSocket } from "../contexts/socket";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import LoadingDialog from "../dialogs/LoadingDialog";
+import MassFuckDialog from "../dialogs/MassFuckDialog";
+import { useSocket } from "../../contexts/socket";
 
 const GAME_STATES = {
   winning: "winning",
@@ -18,25 +20,37 @@ const Game = ({ who }: GameProps) => {
   const router = useRouter();
   const { socket } = useSocket();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isDashboardOnline, setIsDashboardOnline] = useState<boolean>(false);
   const [gameState, setGameState] = useState<string>(GAME_STATES.pausing);
   const [loss, setLoss] = useState<string>("");
   const [isLossSubmitted, setIsLossSubmitted] = useState<boolean>(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isOnlineUsersVisible, setIsOnlineUsersVisible] = useState<boolean>(false);
+  const [numberOfPlayers, setNumberOfPlayers] = useState<number>(0);
+  const [isMassFuckOptionsVisible, setIsMassFuckOptionsVisible] = useState<boolean>(false);
+  const [massFuckOption, setMassFuckOption] = useState<"" | "hit" | "miss">("");
+
+  const isShowingMassFuckDialog = useMemo(
+    () => massFuckOption === "hit" || massFuckOption === "miss",
+    [massFuckOption]
+  );
 
   useEffect(() => {
     socket?.on("connect", () => {
+      setIsLoading(false);
       console.log("my socket id", socket?.id);
       socket.emit("new-user", who);
       socket.emit("status");
     });
-  }, [who]);
+  }, [who, socket]);
 
   useEffect(() => {
-    socket?.on("status", (isDashboardOnline, gameState, winner) => {
+    socket?.on("status", (isDashboardOnline, gameState, winner, losses, numberOfPlayers) => {
       setIsDashboardOnline(isDashboardOnline);
       setGameState(gameState);
+      setNumberOfPlayers(numberOfPlayers);
+      if (!!losses[who]) setIsLossSubmitted(true);
 
       if (winner !== "") {
         if (winner !== who) {
@@ -50,7 +64,7 @@ const Game = ({ who }: GameProps) => {
     return () => {
       socket?.off("status");
     };
-  }, []);
+  }, [who, socket]);
 
   useEffect(() => {
     socket?.on("update-users", (onlineUsers) => {
@@ -60,7 +74,7 @@ const Game = ({ who }: GameProps) => {
     return () => {
       socket?.off("update-users");
     };
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     socket?.on("pause", () => {
@@ -75,7 +89,7 @@ const Game = ({ who }: GameProps) => {
       socket?.off("pause");
       socket?.off("play");
     };
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     socket?.on("lose", () => {
@@ -86,7 +100,7 @@ const Game = ({ who }: GameProps) => {
     return () => {
       socket?.off("lose");
     };
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     socket?.on("cancel", () => {
@@ -97,7 +111,7 @@ const Game = ({ who }: GameProps) => {
     return () => {
       socket?.off("cancel");
     };
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     socket?.on("kick", () => {
@@ -107,16 +121,26 @@ const Game = ({ who }: GameProps) => {
     return () => {
       socket?.off("kick");
     };
-  }, []);
+  }, [socket, router]);
+
+  useEffect(() => {
+    socket?.on("disconnect", () => {
+      setIsLoading(true);
+    });
+
+    return () => {
+      socket?.off("disconnect");
+    };
+  }, [socket]);
 
   const handleWin = useCallback(() => {
     setGameState(GAME_STATES.winning);
     socket?.emit("win", who);
-  }, [who]);
+  }, [who, socket]);
 
   const handleCancel = useCallback(() => {
     socket?.emit("cancel");
-  }, []);
+  }, [socket]);
 
   const handleLossChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setLoss(e.target.value);
@@ -128,16 +152,31 @@ const Game = ({ who }: GameProps) => {
     setLoss("");
     setIsLossSubmitted(true);
     socket?.emit("loss-submit", who, Number.parseInt(loss));
-  }, [loss]);
+  }, [who, socket, loss]);
 
   const handleShowOnlineUsers = useCallback(() => {
     setIsOnlineUsersVisible(!isOnlineUsersVisible);
   }, [isOnlineUsersVisible]);
 
-  const handleReportFuck = useCallback((fucker: string, fucked: string) => {
-    setIsOnlineUsersVisible(false);
-    socket?.emit("report-fuck", fucker, fucked);
-  }, []);
+  const handleShowMassFuckOptions = useCallback(() => {
+    setIsMassFuckOptionsVisible(!isMassFuckOptionsVisible);
+  }, [isMassFuckOptionsVisible]);
+
+  const handleReportFuck = useCallback(
+    (fucker: string, fucked: string) => {
+      setIsOnlineUsersVisible(false);
+      socket?.emit("report-fuck", fucker, fucked);
+    },
+    [socket]
+  );
+
+  const handleClickMassFuckOption = useCallback(
+    (massFuckOption: "" | "hit" | "miss") => {
+      setMassFuckOption(massFuckOption);
+      setIsMassFuckOptionsVisible(false);
+    },
+    [socket]
+  );
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -153,7 +192,7 @@ const Game = ({ who }: GameProps) => {
             <p>Game Paused</p>
           ) : gameState === GAME_STATES.playing ? (
             <>
-              <button onClick={handleWin} className="bg-red-400 text-8xl font-bold">
+              <button onClick={handleWin} className="bg-red-400 text-8xl font-bold hover:focus:active:bg-red-700">
                 Win 🎉
               </button>
             </>
@@ -169,7 +208,9 @@ const Game = ({ who }: GameProps) => {
               <>
                 <h3>You lose</h3>
                 <input type="tel" value={loss} onChange={handleLossChange} />
-                <button onClick={handleSubmitLoss}>Cay</button>
+                <button disabled={loss.length === 0} onClick={handleSubmitLoss}>
+                  🌶
+                </button>
               </>
             )
           ) : (
@@ -181,30 +222,56 @@ const Game = ({ who }: GameProps) => {
       </div>
 
       {gameState === GAME_STATES.playing && (
-        <>
-          <button onClick={handleShowOnlineUsers} className="mx-4 mb-0 rounded-b-none bg-green-400 text-lg font-bold">
-            Chặt 🐷 zone
-          </button>
-
-          <div className="mx-4 bg-green-200">
-            {isOnlineUsersVisible && (
-              <>
-                {onlineUsers.filter((user) => user !== who).length === 0 ? (
-                  <p className="p-2 text-gray-700">No other users</p>
-                ) : (
-                  onlineUsers
-                    .filter((user) => user !== who)
-                    .map((user) => (
-                      <button key={user} onClick={() => handleReportFuck(who, user)} className="bg-yellow-200">
-                        {user}
-                      </button>
-                    ))
-                )}
-              </>
-            )}
+        <div className="m-auto flex w-full max-w-md items-end justify-center space-x-4">
+          <div className="w-full select-none">
+            <button onClick={handleShowOnlineUsers} className="m-0 w-full rounded-b-none">
+              <h2>🔪🐷</h2>
+            </button>
+            <div className="w-full bg-slate-800">
+              {isOnlineUsersVisible && (
+                <div className="flex flex-wrap justify-center">
+                  {onlineUsers.filter((user) => user !== who).length === 0 ? (
+                    <p className="m-2 p-2">No other users</p>
+                  ) : (
+                    onlineUsers
+                      .filter((user) => user !== who)
+                      .map((user) => (
+                        <button key={user} onClick={() => handleReportFuck(who, user)}>
+                          {user}
+                        </button>
+                      ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </>
+
+          <div className="m-0 w-full">
+            <button onClick={handleShowMassFuckOptions} className="m-0 w-full rounded-b-none">
+              <h2>🌪</h2>
+            </button>
+            <div className="flex w-full justify-center bg-slate-800">
+              {isMassFuckOptionsVisible && (
+                <>
+                  <button onClick={() => handleClickMassFuckOption("hit")}>✅</button>
+                  <button onClick={() => handleClickMassFuckOption("miss")}>❌</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
+
+      <MassFuckDialog
+        who={who}
+        isShowingMassFuckDialog={isShowingMassFuckDialog}
+        massFuckOption={massFuckOption}
+        setMassFuckOption={setMassFuckOption}
+        onlineUsers={onlineUsers}
+        numberOfPlayers={numberOfPlayers}
+      />
+
+      <LoadingDialog isShowingConnectingDialog={isLoading} message="Getting you back to the game..." />
     </div>
   );
 };

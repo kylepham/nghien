@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 
 function useLocalStorage<T>(key: string, initialValue: T) {
-  // if (typeof window === 'undefined') {
-  //   return [initialValue, () => {}] as const;
-  // }
-
   const load = () => {
     try {
       if (typeof window === "undefined") {
@@ -45,16 +41,6 @@ function useLocalStorage<T>(key: string, initialValue: T) {
   useEffect(() => {
     setValue(load());
   }, []);
-
-  // useEffect(() => {
-  //   const onStorageUpdateValue = () => setValue(load());
-  //   window.addEventListener("storage", onStorageUpdateValue);
-  //   window.addEventListener("localStorageUpdate", onStorageUpdateValue);
-  //   return () => {
-  //     window.removeEventListener("storage", onStorageUpdateValue);
-  //     window.removeEventListener("localStorageUpdate", onStorageUpdateValue);
-  //   };
-  // }, [key, storedValue]);
 
   return [storedValue, setValue] as const;
 }

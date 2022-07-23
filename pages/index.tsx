@@ -1,19 +1,18 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import React, { useState } from "react";
-import UserPicker from "../components/UserPicker";
-import UserRegister from "../components/UserRegister";
-import Game from "../components/Game";
+import UserPicker from "../components/home-page/UserPicker";
+import Game from "../components/home-page/Game";
 import { SocketProvider } from "../contexts/socket";
+import UserRegister from "../components/home-page/UserRegister";
 
 const Home: NextPage = () => {
   const [who, setWho] = useState<string | null>(null);
 
   return (
-    <div className="flex h-screen flex-col items-center">
+    <div className="flex h-screen flex-col items-center justify-center px-4">
       <Head>
         <title>Login - Sam Loc</title>
-        <link rel="icon" href="/favicon.ico" />
       </Head>
 
       {who ? (
@@ -23,7 +22,7 @@ const Home: NextPage = () => {
       ) : (
         <>
           <UserPicker setWho={setWho} />
-          {/* <UserRegister /> */}
+          <UserRegister />
         </>
       )}
     </div>
