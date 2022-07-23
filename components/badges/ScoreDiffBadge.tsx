@@ -4,6 +4,7 @@ interface ScoreDiffBadgeProps {
   scoreDiff: number;
   className?: string;
 }
+
 const ScoreDiffBadge = ({ scoreDiff, className }: ScoreDiffBadgeProps) => {
   return scoreDiff < 0 ? (
     <div className={`flex w-fit items-center space-x-1 rounded-lg ${className}`}>
