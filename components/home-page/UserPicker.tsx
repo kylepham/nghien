@@ -23,8 +23,8 @@ const UserPicker = ({ setWho }: UserPickerProps) => {
   }, []);
 
   return (
-    <div className="m-8 flex w-80 flex-col items-center rounded border border-slate-200 p-8">
-      <p className="text-2xl font-bold">Mày là thằng nào?</p>
+    <div className="m-8 flex w-full max-w-sm flex-col items-center space-y-4 rounded border border-slate-200 p-8">
+      <p className="text-center text-2xl font-bold">Mày là thằng nào?</p>
       <div className="flex flex-wrap justify-center">
         {existingUsers.length > 0 ? (
           existingUsers.map((user, index) => {
