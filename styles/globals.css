@@ -22,7 +22,7 @@
   }
 
   button {
-    @apply m-2 select-none rounded-lg bg-slate-700 px-4 py-2 shadow-xl transition-all duration-200 ease-linear hover:focus:active:bg-blue-700 disabled:bg-slate-800 disabled:text-slate-500;
+    @apply m-2 flex select-none items-center justify-center rounded-lg bg-slate-700 px-4 py-2 shadow-xl transition-all duration-200 ease-linear hover:focus:active:bg-blue-700 disabled:bg-slate-800 disabled:text-slate-500;
   }
 
   input {

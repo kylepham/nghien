@@ -179,7 +179,7 @@ const Game = ({ who }: GameProps) => {
   );
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <Head>
         <title>{who} - Sam Loc</title>
       </Head>
