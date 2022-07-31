@@ -76,7 +76,7 @@ const MassFuckDialog = ({
                     <p className="p-2 text-slate-500">Choose {numberOfPlayers - fuckeds.length - 1} more players</p>
                   )}
                 </div>
-                <div className="flex w-full">
+                <div className="flex w-full flex-wrap">
                   {onlineUsers.filter((user) => user !== who).length === 0 ? (
                     <p className="m-2 p-2">No other users</p>
                   ) : (
