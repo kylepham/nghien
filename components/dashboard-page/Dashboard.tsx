@@ -1,10 +1,12 @@
 import Head from "next/head";
+import { useRouter } from "next/router";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Listbox, Transition } from "@headlessui/react";
 import { GoPrimitiveDot } from "react-icons/go";
 import _ from "lodash";
 import Scoreboard from "./Scoreboard";
 import GameLogDialog from "../dialogs/GameLogDialog";
+import DashboardKickedDialog from "../dialogs/DashboardKickedDialog";
 import LoadingDialog from "../dialogs/LoadingDialog";
 import { useSocket } from "../../contexts/socket";
 import useLocalStorage from "../../hooks/useLocalStorage";
@@ -21,8 +23,10 @@ const GAME_STATES = {
 
 const Dashboard = () => {
   const { socket } = useSocket();
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isDashboardKicked, setIsDashboardKicked] = useState(false);
   const [onlineUsers, setOnlineUsers] = useLocalStorage<string[]>("onlineUsers", []);
   const [offlineUsers, setOfflineUsers] = useLocalStorage<string[]>("offlineUsers", []);
   const [scores, setScores] = useLocalStorage<NumberObject>("scores", {});
@@ -66,14 +70,27 @@ const Dashboard = () => {
 
   useEffect(() => {
     socket?.on("connect", () => {
+      socket?.emit("dashboard");
       setIsLoading(false);
       console.log("my socket id", socket.id);
     });
   }, [socket]);
 
   useEffect(() => {
-    socket?.emit("dashboard", gameState, winner, numberOfPlayers);
-  }, [socket, isLoading, gameState, winner, numberOfPlayers]); // emit all updates to prevent sending the default values
+    socket?.emit("dashboard-gamestate", gameState);
+  }, [socket, isLoading, gameState]);
+
+  useEffect(() => {
+    socket?.emit("dashboard-winner", winner);
+  }, [socket, isLoading, winner]);
+
+  useEffect(() => {
+    socket?.emit("dashboard-losses", losses);
+  }, [socket, isLoading, losses]);
+
+  useEffect(() => {
+    socket?.emit("dashboard-number-of-players", numberOfPlayers);
+  }, [socket, isLoading, numberOfPlayers]);
 
   useEffect(() => {
     socket?.on("update-users", (newOnlineUsers: string[]) => {
@@ -191,6 +208,16 @@ const Dashboard = () => {
   }, [socket, scores, numberOfRounds]);
 
   useEffect(() => {
+    socket?.on("kick", () => {
+      setIsDashboardKicked(true);
+    });
+
+    return () => {
+      socket?.off("kick");
+    };
+  }, [socket, router]);
+
+  useEffect(() => {
     socket?.on("disconnect", () => {
       setIsLoading(true);
     });
@@ -300,6 +327,8 @@ const Dashboard = () => {
         fucks={fucks}
         setFucks={setFucks}
       />
+
+      <DashboardKickedDialog isShowingDashboardKickedDialog={isDashboardKicked} />
 
       <LoadingDialog isShowingConnectingDialog={isLoading} message="Reconnecting the dashboard..." />
     </div>

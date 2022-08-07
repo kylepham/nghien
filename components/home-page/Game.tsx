@@ -1,6 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import _ from "lodash";
 import LoadingDialog from "../dialogs/LoadingDialog";
 import MassFuckDialog from "../dialogs/MassFuckDialog";
 import { useSocket } from "../../contexts/socket";
@@ -45,13 +46,49 @@ const Game = ({ who }: GameProps) => {
     });
   }, [who, socket]);
 
-  useEffect(() => {
-    socket?.on("status", (isDashboardOnline, gameState, winner, losses, numberOfPlayers) => {
-      setIsDashboardOnline(isDashboardOnline);
-      setGameState(gameState);
-      setNumberOfPlayers(numberOfPlayers);
-      if (!!losses[who]) setIsLossSubmitted(true);
+  // useEffect(() => {
+  //   socket?.on("status", (isDashboardOnline, gameState, winner, losses, numberOfPlayers) => {
+  //     setIsDashboardOnline(isDashboardOnline);
+  //     setGameState(gameState);
+  //     setNumberOfPlayers(numberOfPlayers);
+  //     if (!!losses[who]) setIsLossSubmitted(true);
 
+  //     if (winner !== "") {
+  //       if (winner !== who) {
+  //         setGameState(GAME_STATES.losing);
+  //       } else {
+  //         setGameState(GAME_STATES.winning);
+  //       }
+  //     }
+  //   });
+
+  //   return () => {
+  //     socket?.off("status");
+  //   };
+  // }, [who, socket]);
+
+  useEffect(() => {
+    socket?.on("status", (isDashboardOnline) => {
+      setIsDashboardOnline(isDashboardOnline);
+    });
+
+    return () => {
+      socket?.off("status");
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    socket?.on("status-gamestate", (gameState) => {
+      if (Object.values(GAME_STATES).includes(gameState)) setGameState(gameState);
+    });
+
+    return () => {
+      socket?.off("status-gamestate");
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    socket?.on("status-winner", (winner) => {
       if (winner !== "") {
         if (winner !== who) {
           setGameState(GAME_STATES.losing);
@@ -62,9 +99,30 @@ const Game = ({ who }: GameProps) => {
     });
 
     return () => {
-      socket?.off("status");
+      socket?.off("status-winner");
     };
-  }, [who, socket]);
+  }, [socket]);
+
+  useEffect(() => {
+    socket?.on("status-losses", (losses) => {
+      if (_.isFinite(losses[who])) setIsLossSubmitted(true);
+      else setIsLossSubmitted(false);
+    });
+
+    return () => {
+      socket?.off("status-losses");
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    socket?.on("status-number-of-players", (numberOfPlayers) => {
+      setNumberOfPlayers(numberOfPlayers);
+    });
+
+    return () => {
+      socket?.off("status-number-of-players");
+    };
+  }, [socket]);
 
   useEffect(() => {
     socket?.on("update-users", (onlineUsers) => {
